@@ -125,7 +125,8 @@ int main(int argc, char *argv[])
     cgengine::core::CodeGenerator generator;
     bool hasErrors = false;
 
-    if (!opts.envFilePath.isEmpty()) {
+    if (!opts.envFilePath.isEmpty())
+    {
         qDebug() << "Setup environment";
         generator.exec(QFileInfo(opts.envFilePath));
 
@@ -166,6 +167,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    qDebug().nospace() << "Finished " << (hasErrors ? "with " RED "errors " RESET : " ") << "in " << timer.elapsed() << " msec";
+    qDebug().nospace() << "Finished" << (hasErrors ? " with " RED "errors " RESET : " ") << "in " << timer.elapsed() << " msec";
     return hasErrors;
 }
