@@ -122,8 +122,8 @@ int main(int argc, char *argv[])
     QDirIterator it(opts.inputPath, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
     while (it.hasNext())
     {
-        const auto &path = it.next();
-        if (opts.filter.isEmpty() || pass(opts.filter, path))
+        it.next();
+        if (opts.filter.isEmpty() || pass(opts.filter, it.fileInfo().filePath()))
         {
             const auto &string = generator.process(it.fileInfo());
             bool saveError = false;
