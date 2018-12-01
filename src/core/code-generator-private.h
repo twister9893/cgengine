@@ -13,6 +13,7 @@ public:
     QString errorString;
 
 public:
+    QString exec(const QString &js);
     QString process(const QString &tmpl, bool *err, bool origin = false);
     QString error(const QString &pattern, const QString &message, int line);
     QString readFile(const QFileInfo &fileInfo);

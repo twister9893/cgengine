@@ -10,9 +10,10 @@
 
 class Options {
 public:
-    QString inputPath;
+    QString inputDir;
     QString outputDir = ".";
     QStringList filter;
+    QString envFilePath;
 };
 
 void printUsage(int argc, char *argv[])
@@ -21,13 +22,15 @@ void printUsage(int argc, char *argv[])
 
     qInfo("Usage: %s [-i | --input PATH] [OPTIONS]\n", argv[0]);
     qInfo("REQUIRED\n"
-          "-i, --input=PATH\n"
+          "-i, --input=DIR\n"
           "    Path pattern for template files\n\n"
           "OPTIONS\n"
           "-o, --output=DIR\n"
           "    Output directory, executing directory by default\n\n"
           "-f, --filter=STRING\n"
           "    Input files filter string\n\n"
+          "-e, --environment=FILE\n"
+          "    JS file, will be executed before template processing\n\n"
           "-s, --silent\n"
           "    Silent mode, no console output\n\n"
           "-h, --help\n"
@@ -39,29 +42,33 @@ Options options(int argc, char *argv[])
 {
     static struct option longOpts[] =
     {
-        { "input",  required_argument, nullptr,  'i' },
-        { "output", required_argument, nullptr,  'o' },
-        { "filter", required_argument, nullptr,  'f' },
-        { "silent", no_argument,       nullptr,  's' },
-        { "help",   no_argument,       nullptr,  'h' },
-        { nullptr,  0,                 nullptr,   0  }
+        { "input",       required_argument, nullptr,  'i' },
+        { "output",      required_argument, nullptr,  'o' },
+        { "filter",      required_argument, nullptr,  'f' },
+        { "environment", required_argument, nullptr,  'e' },
+        { "silent",      no_argument,       nullptr,  's' },
+        { "help",        no_argument,       nullptr,  'h' },
+        { nullptr,       0,                 nullptr,   0  }
     };
 
     Options opts;
     int longOptIndex = 0;
     int opt = 0;
-    while ( (opt = getopt_long(argc, argv, "i:o:f:sh", longOpts, &longOptIndex)) != -1 )
+    while ( (opt = getopt_long(argc, argv, "i:o:f:e:sh", longOpts, &longOptIndex)) != -1 )
     {
         switch (opt)
         {
             case 'i':
-                opts.inputPath = QString(optarg);
+                opts.inputDir = QString(optarg);
                 break;
             case 'o':
                 opts.outputDir = QString(optarg);
                 break;
             case 'f':
                 opts.filter = QString(optarg).split(" ", QString::SkipEmptyParts);
+                break;
+            case 'e':
+                opts.envFilePath = QString(optarg);
                 break;
             case 's':
                 qInstallMessageHandler(qtMsgMuteHandler);
@@ -74,7 +81,7 @@ Options options(int argc, char *argv[])
         }
     }
 
-    if (opts.inputPath.isEmpty())
+    if (opts.inputDir.isEmpty())
     {
         qCritical("Missing required options");
         printUsage(argc, argv);
@@ -114,12 +121,23 @@ int main(int argc, char *argv[])
 
     QElapsedTimer timer;
     timer.start();
-    qDebug() << "Generating files...";
 
     cgengine::core::CodeGenerator generator;
     bool hasErrors = false;
 
-    QDirIterator it(opts.inputPath, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    if (!opts.envFilePath.isEmpty()) {
+        qDebug() << "Setup environment";
+        generator.exec(QFileInfo(opts.envFilePath));
+
+        hasErrors |= generator.hasErrors();
+        if (generator.hasErrors()) {
+            qCritical(RED "    %s\n" RESET, generator.errorString().toLatin1().data());
+        }
+    }
+
+    qDebug() << "Generating files...";
+
+    QDirIterator it(opts.inputDir, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
     while (it.hasNext())
     {
         it.next();

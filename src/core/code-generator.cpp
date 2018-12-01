@@ -27,7 +27,7 @@ CodeGenerator::CodeGenerator(const QFileInfo &js) :
 
 QString CodeGenerator::exec(const QString &js)
 {
-    return d_ptr->jse.evaluate(js).toString();
+    return d_ptr->exec(js);
 }
 
 QString CodeGenerator::exec(const QFileInfo &js)
@@ -63,6 +63,22 @@ QString CodeGenerator::errorString() const
     return d_ptr->errorString;
 }
 
+QString CodeGeneratorPrivate::exec(const QString &js)
+{
+    const auto &value = jse.evaluate(js);
+    if (value.isError()) {
+        hasErrors = true;
+        errorString = "<<<<<< JS runtime ERROR >>>>>>\n\n"
+                    + error(js,
+                            value.property("message").toString(),
+                            value.property("lineNumber").toInt())
+                    + "\n\n"
+                    + value.toString();
+        return QString();
+    }
+    return (value.isUndefined() ? QString() : value.toString());
+}
+
 QString CodeGeneratorPrivate::process(const QString &tmpl, bool *err, bool origin)
 {
     QString expr(tmpl);
@@ -77,17 +93,9 @@ QString CodeGeneratorPrivate::process(const QString &tmpl, bool *err, bool origi
 
     if (!origin)
     {
-        const auto &value = jse.evaluate(expr);
-        if (value.isError()) {
-            hasErrors = *err = true;
-            errorString = error(expr,
-                                value.property("message").toString(),
-                                value.property("lineNumber").toInt())
-                          + "\n\n"
-                          + value.toString();
-            return QString();
-        }
-        return (value.isUndefined() ? QString() : value.toString());
+        const auto &value = exec(expr);
+        *err = hasErrors;
+        return value;
     }
 
     return expr;
