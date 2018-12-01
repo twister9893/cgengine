@@ -41,7 +41,7 @@ QString CodeGenerator::process(const QString &tmpl)
     d_ptr->errorString.clear();
 
     bool error = false;
-    return d_ptr->process(tmpl, &error);
+    return d_ptr->process(tmpl, &error, true);
 }
 
 QString CodeGenerator::process(const QFileInfo &tmpl)
@@ -50,7 +50,7 @@ QString CodeGenerator::process(const QFileInfo &tmpl)
     d_ptr->errorString.clear();
 
     bool error = false;
-    return d_ptr->process( d_ptr->readFile(tmpl), &error );
+    return d_ptr->process( d_ptr->readFile(tmpl), &error, true );
 }
 
 bool CodeGenerator::hasErrors() const
@@ -63,10 +63,10 @@ QString CodeGenerator::errorString() const
     return d_ptr->errorString;
 }
 
-QString CodeGeneratorPrivate::process(const QString &tmpl, bool *err)
+QString CodeGeneratorPrivate::process(const QString &tmpl, bool *err, bool origin)
 {
     QString expr(tmpl);
-    QRegExp rx("%<\\|([^%<]+)\\|>", Qt::CaseSensitive, QRegExp::RegExp);
+    QRegExp rx("<%\\n?([^%]+)\\n?%>", Qt::CaseSensitive, QRegExp::RegExp);
     rx.setMinimal(true);
 
     while ( rx.indexIn(expr) != -1)
@@ -75,17 +75,22 @@ QString CodeGeneratorPrivate::process(const QString &tmpl, bool *err)
         if (err && *err) { return QString(); }
     }
 
-    const auto &value = jse.evaluate(expr);
-    if (value.isError()) {
-        hasErrors = *err = true;
-        errorString = error(expr,
-                            value.property("message").toString(),
-                            value.property("lineNumber").toInt())
-                      + "\n\n"
-                      + value.toString();
-        return QString();
+    if (!origin)
+    {
+        const auto &value = jse.evaluate(expr);
+        if (value.isError()) {
+            hasErrors = *err = true;
+            errorString = error(expr,
+                                value.property("message").toString(),
+                                value.property("lineNumber").toInt())
+                          + "\n\n"
+                          + value.toString();
+            return QString();
+        }
+        return (value.isUndefined() ? QString() : value.toString());
     }
-    return (value.isUndefined() ? QString() : value.toString());
+
+    return expr;
 }
 
 QString CodeGeneratorPrivate::error(const QString &pattern, const QString &message, int line)
@@ -93,7 +98,7 @@ QString CodeGeneratorPrivate::error(const QString &pattern, const QString &messa
     auto lines = pattern.split(QChar('\n'));
     if (line >= 0 && line < lines.count())
     {
-        lines[line].append(QString("    <---- %1").arg(message));
+        lines[line-1].append(QString("    <---- %1").arg(message));
     }
     return lines.join(QChar('\n'));
 }
