@@ -1,10 +1,36 @@
-#ifndef CODEGENERATOR_H
-#define CODEGENERATOR_H
+#ifndef CGENGINE_CORE_CODEGENERATOR_H
+#define CGENGINE_CORE_CODEGENERATOR_H
 
-class CodeGenerator
-{
+#include <QScopedPointer>
+
+class QString;
+class QFileInfo;
+
+namespace cgengine { namespace core {
+
+class CodeGeneratorPrivate;
+class CodeGenerator {
 public:
+    ~CodeGenerator();
     CodeGenerator();
+    CodeGenerator(const QString &js);
+    CodeGenerator(const QFileInfo &js);
+
+public:
+    QString exec(const QString &js);
+    QString exec(const QFileInfo &js);
+
+    QString process(const QString &tmpl);
+    QString process(const QFileInfo &tmpl);
+
+public:
+    bool hasErrors() const;
+    QString errorString() const;
+
+private:
+    QScopedPointer<CodeGeneratorPrivate> d_ptr;
 };
 
-#endif // CODEGENERATOR_H
+}}
+
+#endif // CGENGINE_CORE_CODEGENERATOR_H

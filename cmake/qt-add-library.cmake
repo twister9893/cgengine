@@ -27,6 +27,8 @@ function(qt_add_library target)
                                  ${${target}_UIrcs}
                                  ${${target}_RESrcs})
 
-    target_link_libraries(${target} ${QT_LIBRARIES} ${LIB_DEPS})
+    target_link_libraries(${target} ${LIB_DEPS})
+
+    qt5_use_modules(${target} Core Quick Qml)
 
 endfunction()
