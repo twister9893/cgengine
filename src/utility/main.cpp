@@ -12,8 +12,8 @@ class Options {
 public:
     QString inputDir;
     QString outputDir = ".";
-    QStringList filter;
-    QString envFilePath;
+    QStringList templates;
+    QStringList environment;
 };
 
 void printUsage(int argc, char *argv[])
@@ -27,10 +27,10 @@ void printUsage(int argc, char *argv[])
           "OPTIONS\n"
           "-o, --output=DIR\n"
           "    Output directory, executing directory by default\n\n"
-          "-f, --filter=STRING\n"
-          "    Input files filter string\n\n"
-          "-e, --environment=FILE\n"
-          "    JS file, will be executed before template processing\n\n"
+          "-t, --template=STRING\n"
+          "    Template files filter string\n\n"
+          "-e, --environment=STRING\n"
+          "    Environment JS files filter string, templates will be processed as many times as files found\n\n"
           "-s, --silent\n"
           "    Silent mode, no console output\n\n"
           "-h, --help\n"
@@ -44,7 +44,7 @@ Options options(int argc, char *argv[])
     {
         { "input",       required_argument, nullptr,  'i' },
         { "output",      required_argument, nullptr,  'o' },
-        { "filter",      required_argument, nullptr,  'f' },
+        { "template",    required_argument, nullptr,  't' },
         { "environment", required_argument, nullptr,  'e' },
         { "silent",      no_argument,       nullptr,  's' },
         { "help",        no_argument,       nullptr,  'h' },
@@ -54,7 +54,7 @@ Options options(int argc, char *argv[])
     Options opts;
     int longOptIndex = 0;
     int opt = 0;
-    while ( (opt = getopt_long(argc, argv, "i:o:f:e:sh", longOpts, &longOptIndex)) != -1 )
+    while ( (opt = getopt_long(argc, argv, "i:o:t:e:sh", longOpts, &longOptIndex)) != -1 )
     {
         switch (opt)
         {
@@ -64,11 +64,11 @@ Options options(int argc, char *argv[])
             case 'o':
                 opts.outputDir = QString(optarg);
                 break;
-            case 'f':
-                opts.filter = QString(optarg).split(" ", QString::SkipEmptyParts);
+            case 't':
+                opts.templates = QString(optarg).split(" ", QString::SkipEmptyParts);
                 break;
             case 'e':
-                opts.envFilePath = QString(optarg);
+                opts.environment = QString(optarg).split(" ", QString::SkipEmptyParts);
                 break;
             case 's':
                 qInstallMessageHandler(qtMsgMuteHandler);
@@ -101,17 +101,49 @@ bool pass(const QStringList &filter, const QString &path)
     return false;
 }
 
-bool save(const QString &string, const QString &path, QString *errorString = nullptr)
+bool generate(cgengine::core::CodeGenerator *generator, const Options &opts)
 {
-    QFile file(path);
-    if (file.open(QFile::WriteOnly)) {
-        QTextStream stream(&file);
-        stream << string;
-        return true;
-    } else {
-        if (errorString) { *errorString = file.errorString(); }
+    bool hasErrors = false;
+    QDirIterator it(opts.inputDir, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    while (it.hasNext())
+    {
+        it.next();
+        if (opts.templates.isEmpty() || pass(opts.templates, it.fileInfo().filePath()))
+        {
+            const auto &generatedFilePath = generator->generate(it.fileInfo(), opts.outputDir);
+            hasErrors |= generator->hasErrors();
+
+            qDebug("[ %s ] %s --> %s", (generator->hasErrors() ? RED "ER" RESET : GREEN "OK" RESET),
+                                        it.filePath().toLatin1().data(),
+                                        generatedFilePath.toLatin1().data());
+
+            if (generator->hasErrors()) {
+                qCritical(RED "    %s\n" RESET, generator->errorString().toLatin1().data());
+            }
+        }
     }
-    return false;
+    return !hasErrors;
+}
+
+bool run(cgengine::core::CodeGenerator *generator, const Options &opts)
+{
+    bool hasErrors = false;
+    QDirIterator it(opts.inputDir, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    while (it.hasNext())
+    {
+        it.next();
+        if (opts.environment.isEmpty() || pass(opts.environment, it.fileInfo().filePath()))
+        {
+            generator->exec(it.fileInfo());
+            hasErrors |= generator->hasErrors();
+            if (generator->hasErrors()) {
+                qCritical(RED "    %s\n" RESET, generator->errorString().toLatin1().data());
+            }
+
+            hasErrors |= !generate(generator, opts);
+        }
+    }
+    return !hasErrors;
 }
 
 int main(int argc, char *argv[])
@@ -123,49 +155,9 @@ int main(int argc, char *argv[])
     timer.start();
 
     cgengine::core::CodeGenerator generator;
-    bool hasErrors = false;
-
-    if (!opts.envFilePath.isEmpty())
-    {
-        qDebug() << "Setup environment";
-        generator.exec(QFileInfo(opts.envFilePath));
-
-        hasErrors |= generator.hasErrors();
-        if (generator.hasErrors()) {
-            qCritical(RED "    %s\n" RESET, generator.errorString().toLatin1().data());
-        }
-    }
 
     qDebug() << "Generating files...";
-
-    QDirIterator it(opts.inputDir, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
-    while (it.hasNext())
-    {
-        it.next();
-        if (opts.filter.isEmpty() || pass(opts.filter, it.fileInfo().filePath()))
-        {
-            const auto &string = generator.process(it.fileInfo());
-            bool saveError = false;
-            QString saveErrorString;
-
-            if (!generator.hasErrors()) {
-                saveError = !save(string, opts.outputDir + QDir::separator() + it.fileInfo().baseName(), &saveErrorString);
-            }
-
-            hasErrors |= generator.hasErrors();
-            hasErrors |= saveError;
-
-            qDebug("[ %s ] %s", (generator.hasErrors() || saveError ? RED "ER" RESET : GREEN "OK" RESET),
-                                it.filePath().toLatin1().data());
-
-            if (generator.hasErrors()) {
-                qCritical(RED "    %s\n" RESET, generator.errorString().toLatin1().data());
-            }
-            if (saveError) {
-                qCritical(RED "    %s\n" RESET, saveErrorString.toLatin1().data());
-            }
-        }
-    }
+    bool hasErrors = !run(&generator, opts);
 
     qDebug().nospace() << "Finished" << (hasErrors ? " with " RED "errors " RESET : " ") << "in " << timer.elapsed() << " msec";
     return hasErrors;

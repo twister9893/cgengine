@@ -23,6 +23,9 @@ public:
     QString process(const QString &tmpl);
     QString process(const QFileInfo &tmpl);
 
+    QString generate(const QString &tmpl, const QString &path);
+    QString generate(const QFileInfo &tmpl, const QString &path);
+
 public:
     bool hasErrors() const;
     QString errorString() const;

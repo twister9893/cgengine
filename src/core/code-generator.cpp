@@ -2,6 +2,7 @@
 #include "code-generator-private.h"
 
 #include <QDebug>
+#include <QDir>
 #include <QTextStream>
 
 namespace cgengine { namespace core {
@@ -27,7 +28,7 @@ CodeGenerator::CodeGenerator(const QFileInfo &js) :
 
 QString CodeGenerator::exec(const QString &js)
 {
-    return d_ptr->exec(js);
+    return d_ptr->exec(js).toString();
 }
 
 QString CodeGenerator::exec(const QFileInfo &js)
@@ -53,6 +54,22 @@ QString CodeGenerator::process(const QFileInfo &tmpl)
     return d_ptr->process( d_ptr->readFile(tmpl), &error, true );
 }
 
+QString CodeGenerator::generate(const QString &tmpl, const QString &path)
+{
+    d_ptr->hasErrors = false;
+    d_ptr->errorString.clear();
+
+    return d_ptr->generate(tmpl, path);
+}
+
+QString CodeGenerator::generate(const QFileInfo &tmpl, const QString &path)
+{
+    d_ptr->hasErrors = false;
+    d_ptr->errorString.clear();
+
+    return d_ptr->generate( d_ptr->readFile(tmpl), path );
+}
+
 bool CodeGenerator::hasErrors() const
 {
     return d_ptr->hasErrors;
@@ -63,7 +80,7 @@ QString CodeGenerator::errorString() const
     return d_ptr->errorString;
 }
 
-QString CodeGeneratorPrivate::exec(const QString &js)
+QJSValue CodeGeneratorPrivate::exec(const QString &js)
 {
     const auto &value = jse.evaluate(js);
     if (value.isError()) {
@@ -74,9 +91,8 @@ QString CodeGeneratorPrivate::exec(const QString &js)
                             value.property("lineNumber").toInt())
                     + "\n\n"
                     + value.toString();
-        return QString();
     }
-    return (value.isUndefined() ? QString() : value.toString());
+    return value;
 }
 
 QString CodeGeneratorPrivate::process(const QString &tmpl, bool *err, bool origin)
@@ -95,20 +111,28 @@ QString CodeGeneratorPrivate::process(const QString &tmpl, bool *err, bool origi
     {
         const auto &value = exec(expr);
         *err = hasErrors;
-        return value;
+        return (value.isUndefined() ? QString() : value.toString());
     }
 
     return expr;
 }
 
-QString CodeGeneratorPrivate::error(const QString &pattern, const QString &message, int line)
+QString CodeGeneratorPrivate::generate(const QString &tmpl, const QString &path)
 {
-    auto lines = pattern.split(QChar('\n'));
-    if (line >= 0 && line < lines.count())
-    {
-        lines[line-1].append(QString("    <---- %1").arg(message));
+    bool err;
+    const auto &src = process(tmpl, &err, true);
+    if (hasErrors) {
+        return QString();
     }
-    return lines.join(QChar('\n'));
+
+    const auto &fileName = exec("__fileName__");
+    if (hasErrors) {
+        return QString();
+    }
+
+    const QString filePath = path + QDir::separator() + fileName.toString();
+    saveFile(src, filePath);
+    return filePath;
 }
 
 QString CodeGeneratorPrivate::readFile(const QFileInfo &fileInfo)
@@ -122,6 +146,30 @@ QString CodeGeneratorPrivate::readFile(const QFileInfo &fileInfo)
         errorString = fileInfo.filePath() + " opening failed, " + file.errorString();
     }
     return QString();
+}
+
+bool CodeGeneratorPrivate::saveFile(const QString &string, const QString &filePath)
+{
+    QFile file(filePath);
+    if (file.open(QFile::WriteOnly)) {
+        QTextStream stream(&file);
+        stream << string;
+        return true;
+    } else {
+        hasErrors = true;
+        errorString = file.errorString();
+    }
+    return false;
+}
+
+QString CodeGeneratorPrivate::error(const QString &pattern, const QString &message, int line)
+{
+    auto lines = pattern.split(QChar('\n'));
+    if (line >= 0 && line < lines.count())
+    {
+        lines[line-1].append(QString("    <---- %1").arg(message));
+    }
+    return lines.join(QChar('\n'));
 }
 
 }}

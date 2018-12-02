@@ -13,10 +13,15 @@ public:
     QString errorString;
 
 public:
-    QString exec(const QString &js);
+    QJSValue exec(const QString &js);
     QString process(const QString &tmpl, bool *err, bool origin = false);
-    QString error(const QString &pattern, const QString &message, int line);
+    QString generate(const QString &tmpl, const QString &path);
+
     QString readFile(const QFileInfo &fileInfo);
+    bool saveFile(const QString &string, const QString &filePath);
+
+private:
+    QString error(const QString &pattern, const QString &message, int line);
 };
 
 }}
