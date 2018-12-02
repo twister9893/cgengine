@@ -141,7 +141,10 @@ bool run(cgengine::core::CodeGenerator *generator, const Options &opts)
                 qCritical(RED "    %s\n" RESET, generator->errorString().toLatin1().data());
             }
 
-            hasErrors |= !generate(generator, opts);
+            int repeats = generator->value("__repeats__", "1").toInt();
+            while (repeats--) {
+                hasErrors |= !generate(generator, opts);
+            }
         }
     }
     return !hasErrors;

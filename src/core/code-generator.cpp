@@ -70,6 +70,12 @@ QString CodeGenerator::generate(const QFileInfo &tmpl, const QString &path)
     return d_ptr->generate( d_ptr->readFile(tmpl), path );
 }
 
+QString CodeGenerator::value(const QString &name, const QString &defaultValue)
+{
+    const auto &value = d_ptr->jse.evaluate(name);
+    return (value.isUndefined() ? defaultValue : value.toString());
+}
+
 bool CodeGenerator::hasErrors() const
 {
     return d_ptr->hasErrors;

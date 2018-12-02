@@ -2,8 +2,8 @@
 #define CGENGINE_CORE_CODEGENERATOR_H
 
 #include <QScopedPointer>
+#include <QString>
 
-class QString;
 class QFileInfo;
 
 namespace cgengine { namespace core {
@@ -25,6 +25,8 @@ public:
 
     QString generate(const QString &tmpl, const QString &path);
     QString generate(const QFileInfo &tmpl, const QString &path);
+
+    QString value(const QString &name, const QString &defaultValue = QString());
 
 public:
     bool hasErrors() const;
