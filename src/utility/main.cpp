@@ -136,6 +136,7 @@ bool run(cgengine::core::CodeGenerator *generator, const Options &opts)
         {
             generator->exec(it.fileInfo());
             hasErrors |= generator->hasErrors();
+
             if (generator->hasErrors()) {
                 qCritical(RED "    %s\n" RESET, generator->errorString().toLatin1().data());
             }
@@ -150,11 +151,10 @@ int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
     Options opts = options(argc, argv);
+    cgengine::core::CodeGenerator generator;
 
     QElapsedTimer timer;
     timer.start();
-
-    cgengine::core::CodeGenerator generator;
 
     qDebug() << "Generating files...";
     bool hasErrors = !run(&generator, opts);
