@@ -13,7 +13,8 @@ public:
     QString inputDir;
     QString outputDir = ".";
     QStringList templates;
-    QStringList environment;
+    QStringList environments;
+    QStringList preprocessors;
 };
 
 void printUsage(int argc, char *argv[])
@@ -30,7 +31,7 @@ void printUsage(int argc, char *argv[])
           "-t, --template=STRING\n"
           "    Template files filter string\n\n"
           "-e, --environment=STRING\n"
-          "    Environment JS files filter string, templates will be processed as many times as files found\n\n"
+          "    Environment JS files filter string, templates processing runs for each found file\n\n"
           "-s, --silent\n"
           "    Silent mode, no console output\n\n"
           "-h, --help\n"
@@ -42,13 +43,13 @@ Options options(int argc, char *argv[])
 {
     static struct option longOpts[] =
     {
-        { "input",       required_argument, nullptr,  'i' },
-        { "output",      required_argument, nullptr,  'o' },
-        { "template",    required_argument, nullptr,  't' },
-        { "environment", required_argument, nullptr,  'e' },
-        { "silent",      no_argument,       nullptr,  's' },
-        { "help",        no_argument,       nullptr,  'h' },
-        { nullptr,       0,                 nullptr,   0  }
+        { "input",        required_argument, nullptr,  'i' },
+        { "output",       required_argument, nullptr,  'o' },
+        { "template",     required_argument, nullptr,  't' },
+        { "environment",  required_argument, nullptr,  'e' },
+        { "silent",       no_argument,       nullptr,  's' },
+        { "help",         no_argument,       nullptr,  'h' },
+        { nullptr,        0,                 nullptr,   0  }
     };
 
     Options opts;
@@ -68,7 +69,7 @@ Options options(int argc, char *argv[])
                 opts.templates = QString(optarg).split(" ", QString::SkipEmptyParts);
                 break;
             case 'e':
-                opts.environment = QString(optarg).split(" ", QString::SkipEmptyParts);
+                opts.environments = QString(optarg).split(" ", QString::SkipEmptyParts);
                 break;
             case 's':
                 qInstallMessageHandler(qtMsgMuteHandler);
@@ -93,58 +94,102 @@ Options options(int argc, char *argv[])
 
 bool pass(const QStringList &filter, const QString &path)
 {
+    if (filter.isEmpty()) {
+        return true;
+    }
     for (const auto &entry : filter) {
-        if (path.contains( QRegExp(entry) )) {
+        if (path.contains( QRegExp(entry, Qt::CaseSensitive, QRegExp::WildcardUnix) )) {
             return true;
         }
     }
     return false;
 }
 
-bool generate(cgengine::core::CodeGenerator *generator, const Options &opts)
+bool process(cgengine::core::CodeGenerator *generator, const Options &opts)
 {
     bool hasErrors = false;
     QDirIterator it(opts.inputDir, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
     while (it.hasNext())
     {
         it.next();
-        if (opts.templates.isEmpty() || pass(opts.templates, it.fileInfo().filePath()))
+        if (!pass(opts.templates,
+                  it.fileInfo().filePath()))
         {
-            const auto &generatedFilePath = generator->generate(it.fileInfo(), opts.outputDir);
-            hasErrors |= generator->hasErrors();
+            continue;
+        }
+        if (!pass( generator->value("__filter__").split(" ", QString::SkipEmptyParts),
+                   it.fileInfo().filePath()))
+        {
+            continue;
+        }
 
-            qDebug("[ %s ] %s --> %s", (generator->hasErrors() ? RED "ER" RESET : GREEN "OK" RESET),
-                                        it.filePath().toLatin1().data(),
-                                        generatedFilePath.toLatin1().data());
+        const auto &generatedFilePath = generator->generate(it.fileInfo(), opts.outputDir);
+        hasErrors |= generator->hasErrors();
 
-            if (generator->hasErrors()) {
-                qCritical(RED "    %s\n" RESET, generator->errorString().toLatin1().data());
-            }
+        qDebug("[ %s ] %s --> %s", (generator->hasErrors() ? RED "ER" RESET : GREEN "OK" RESET),
+                                    it.fileName().toLatin1().data(),
+                                    QFileInfo(generatedFilePath).fileName().toLatin1().data());
+
+        if (generator->hasErrors()) {
+            qCritical(RED "    %s\n" RESET, generator->errorString().toLatin1().data());
         }
     }
     return !hasErrors;
 }
 
-bool run(cgengine::core::CodeGenerator *generator, const Options &opts)
+bool generate(cgengine::core::CodeGenerator *generator, const Options &opts)
 {
     bool hasErrors = false;
-    QDirIterator it(opts.inputDir, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+
+    const auto & preprocessorPath = generator->value("__preprocessor__", "");
+    if (!preprocessorPath.isEmpty())
+    {
+        generator->exec(QFileInfo(opts.inputDir + QDir::separator() + preprocessorPath));
+        hasErrors |= generator->hasErrors();
+
+        if (generator->hasErrors()) {
+            qCritical(RED "    %s\n" RESET, generator->errorString().toLatin1().data());
+        }
+    }
+
+    hasErrors |= !process(generator, opts);
+
+    return !hasErrors;
+}
+
+QStringList collectEnvironments(const QString &inputDir, const QStringList &filter)
+{
+    QDirIterator it(inputDir, QDir::Files | QDir::Hidden | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    QStringList envFiles;
     while (it.hasNext())
     {
         it.next();
-        if (opts.environment.isEmpty() || pass(opts.environment, it.fileInfo().filePath()))
+        if (pass(filter, it.fileInfo().filePath()))
         {
-            generator->exec(it.fileInfo());
-            hasErrors |= generator->hasErrors();
+            envFiles << it.filePath();
+        }
+    }
+    envFiles.sort();
+    return envFiles;
+}
 
-            if (generator->hasErrors()) {
-                qCritical(RED "    %s\n" RESET, generator->errorString().toLatin1().data());
-            }
+bool run(cgengine::core::CodeGenerator *generator, const Options &opts)
+{
+    bool hasErrors = false;
 
-            int repeats = generator->value("__repeats__", "1").toInt();
-            while (repeats--) {
-                hasErrors |= !generate(generator, opts);
-            }
+    const auto &envFiles = collectEnvironments(opts.inputDir, opts.environments);
+    for (const auto &envPath : envFiles)
+    {
+        generator->exec(QFileInfo(envPath));
+        hasErrors |= generator->hasErrors();
+
+        if (generator->hasErrors()) {
+            qCritical(RED "    %s\n" RESET, generator->errorString().toLatin1().data());
+        }
+
+        int repeats = generator->value("__repeat__", "0").toInt();
+        while (repeats--) {
+            hasErrors |= !generate(generator, opts);
         }
     }
     return !hasErrors;

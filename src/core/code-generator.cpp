@@ -5,6 +5,8 @@
 #include <QDir>
 #include <QTextStream>
 
+#include "jsconsole.h"
+
 namespace cgengine { namespace core {
 
 CodeGenerator::~CodeGenerator()
@@ -84,6 +86,13 @@ bool CodeGenerator::hasErrors() const
 QString CodeGenerator::errorString() const
 {
     return d_ptr->errorString;
+}
+
+CodeGeneratorPrivate::CodeGeneratorPrivate()
+{
+    JSConsole *console = new JSConsole(&jse);
+    const auto & jsconsole = jse.newQObject(console);
+    jse.globalObject().setProperty("console", jsconsole);
 }
 
 QJSValue CodeGeneratorPrivate::exec(const QString &js)

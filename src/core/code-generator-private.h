@@ -13,6 +13,9 @@ public:
     QString errorString;
 
 public:
+    CodeGeneratorPrivate();
+
+public:
     QJSValue exec(const QString &js);
     QString process(const QString &tmpl, bool *err, bool origin = false);
     QString generate(const QString &tmpl, const QString &path);
