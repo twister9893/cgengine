@@ -1,0 +1,186 @@
+<% 
+    var __fileName__ = t.struct.name.toLowerCase()+'-base.cpp';
+    headComment;
+%>
+#include "<%t.struct.name.toLowerCase()%>-base.h"
+#include "<%t.struct.name.toLowerCase()%>-repository.h"
+
+#include <messaging/core/api/stream.h>
+
+namespace <%model.name%> {
+
+<%t.struct.Name%>Base::~<%t.struct.Name%>Base()
+{}
+
+void <%t.struct.Name%>Base::setPackedKey(const QByteArray &_key)
+{
+<%
+    if (t.singleton()) 
+    {
+'    Q_UNUSED(_key)';
+    } 
+    else 
+    {
+        var str = '';
+        str +=
+
+'    QByteArray keyBuffer(_key);\n'+
+'    QDataStream stream(&keyBuffer, QIODevice::ReadOnly);\n'+
+'\n'+
+'    using ::messaging::core::api::operator>>;';
+
+        t.keys.forEach( function(keyStr) 
+        {
+            var substr =
+'\n\n'+
+'    auto ${keyVarName}Tmp = ${keyGetterStr}();\n'+
+'    stream >> ${keyVarName}Tmp;\n'+
+'    ${keySetterStr}(${keyVarName}Tmp);\n';
+
+            var keyTupple = keyStr.split('.');
+            var keyVarName = '';
+            var keyGetterStr = '';
+            var keySetterStr = '';
+            for (var i = 0; i < keyTupple.length; ++i)
+            {
+                if (keyTupple.length === 1) {
+                    keyVarName += keyTupple[i];
+                    keyGetterStr += keyTupple[i];
+                    keySetterStr += 'set' + keyTupple[i].capitalized();
+                } else if (i === 0) {
+                    keyVarName += keyTupple[i];
+                    keyGetterStr += keyTupple[i];
+                    keySetterStr += keyTupple[i];
+                } else if (i === (keyTupple.length-1)) {
+                    keyVarName += keyTupple[i];
+                    keyGetterStr += '.' + keyTupple[i];
+                    keySetterStr += '.set' + keyTupple[i].capitalized();
+                } else {
+                    keyVarName += keyTupple[i].capitalized();
+                    keyGetterStr += '.' + keyTupple[i] + '()';
+                    keySetterStr += '.' + keyTupple[i] + '()';
+                }
+            }
+
+            substr = substr.replace(/\${keyVarName}/g, keyVarName)
+                           .replace(/\${keyGetterStr}/g, keyGetterStr)
+                           .replace(/\${keySetterStr}/g, keySetterStr);
+
+            str += substr;
+        } );
+        str;
+    }
+%>
+}
+
+QByteArray <%t.struct.Name%>Base::packedKey() const
+{
+<%
+    if (t.singleton()) 
+    {
+'    return QByteArray();';
+    } 
+    else 
+    {
+        var str = '';
+        str +=
+
+'    QByteArray keyBuffer;\n'+
+'    QDataStream stream(&keyBuffer, QIODevice::WriteOnly);\n'+
+'\n'+
+'    using ::messaging::core::api::operator<<;\n'+
+'\n';
+
+        t.keys.forEach( function(keyStr) 
+        {
+            var substr =
+
+'    stream << ${keyGetterStr}();\n';
+
+            var keyTupple = keyStr.split('.');
+            var keyGetterStr = '';
+            for (var i = 0; i < keyTupple.length; ++i)
+            {
+                if (keyTupple.length === 1) {
+                    keyGetterStr += keyTupple[i];
+                } else if (i === 0) {
+                    keyGetterStr += keyTupple[i] + '.';
+                } else if (i == keyTupple.length-1) {
+                    keyGetterStr += keyTupple[i];
+                } else {
+                    keyGetterStr += keyTupple[i] + '().';
+                }
+            }
+
+            substr = substr.replace(/\${keyGetterStr}/g, keyGetterStr);
+            str += substr;
+        } );
+        str +=
+
+'\n'+
+'    return keyBuffer;';
+
+        str;
+    }
+%>
+}
+
+void <%t.struct.Name%>Base::sync()
+{
+    <%t.struct.Name%>Repository::write(static_cast<const <%t.struct.Name%>Wrapper&>(*this));
+}
+
+void <%t.struct.Name%>Base::del()
+{
+    <%t.struct.Name%>Repository::remove(static_cast<const <%t.struct.Name%>Wrapper&>(*this));
+}
+
+bool <%t.struct.Name%>Base::load()
+{
+    bool found = false;
+    const auto &data = static_cast<const <%t.struct.Name%>Base&>( <%t.struct.Name%>Repository::select( packedKey(), &found ) );
+    if (found) {
+        *this = data;
+        return true;
+    }
+    return false;
+}
+
+<%t.struct.Name%>Base::<%t.struct.Name%>Base()
+{<%
+    if (t.singleton()) 
+    {
+'\n'+
+'    load();\n';
+    } 
+    else 
+    {
+'';
+    }
+%>}
+
+<%t.struct.Name%>Base::<%t.struct.Name%>Base(void*) :
+    <%t.struct.Name%>()
+{}
+
+<%t.struct.Name%>Base::<%t.struct.Name%>Base(const <%t.struct.Name%>Base & other) :
+    <%t.struct.Name%>(other)
+{}
+
+<%t.struct.Name%>Base::<%t.struct.Name%>Base(<%t.struct.Name%>Base && other) :
+    <%t.struct.Name%>(other)
+{}
+
+<%t.struct.Name%>Base & <%t.struct.Name%>Base::operator=(const <%t.struct.Name%>Base & other)
+{
+    <%t.struct.Name%>::operator=(other);
+    return *this;
+}
+
+<%t.struct.Name%>Base & <%t.struct.Name%>Base::operator=(<%t.struct.Name%>Base && other)
+{
+    <%t.struct.Name%>::operator=(other);
+    return *this;
+}
+
+}

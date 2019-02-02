@@ -1,0 +1,50 @@
+<% 
+    var __fileName__ = t.struct.name.toLowerCase()+'-repository.h';
+    headComment;
+%>
+#ifndef <%t.struct.NAME%>_REPOSITORY_H
+#define <%t.struct.NAME%>_REPOSITORY_H
+
+#include <QObject>
+#include <QScopedPointer>
+
+#include <<%model.name%>/<%t.struct.name.toLowerCase()%>-wrapper.h>
+
+namespace <%model.name%> {
+
+class <%t.struct.Name%>RepositoryPrivate;
+class <%t.struct.Name%>Repository : public QObject {
+    Q_OBJECT
+public:
+    ~<%t.struct.Name%>Repository();
+    static <%t.struct.Name%>Repository & instance();
+
+public:
+    static bool configure(const QString &configString);
+
+    static void write(const <%t.struct.Name%>Wrapper & data);
+    static void remove(const <%t.struct.Name%>Wrapper & data);
+
+    static QList<<%t.struct.Name%>Wrapper> select();
+    static <%t.struct.Name%>Wrapper select(const QByteArray &key, bool *found = nullptr);
+    static int count();
+
+signals:
+    void received(const <%model.name%>::<%t.struct.Name%>Wrapper & data);
+    void removed(const <%model.name%>::<%t.struct.Name%>Wrapper & data);
+
+private:
+    <%t.struct.Name%>Repository(const QString & configString = QString());
+    static <%t.struct.Name%>Repository & instance(const QString & configString);
+
+private:
+    Q_DISABLE_COPY(<%t.struct.Name%>Repository)
+    QScopedPointer<<%t.struct.Name%>RepositoryPrivate> d_ptr;
+
+private:
+    friend class <%t.struct.Name%>RepositoryPrivate;
+};
+
+}
+
+#endif // <%t.struct.NAME%>_REPOSITORY_H

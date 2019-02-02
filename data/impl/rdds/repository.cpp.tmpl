@@ -1,0 +1,327 @@
+<% 
+    var __fileName__ = t.struct.name.toLowerCase()+'-repository.cpp';
+
+    function rdds(type) {
+        return 'rdds_'+model.name+'::'+type;
+    }
+    headComment;
+%>
+#include "<%t.struct.name.toLowerCase()%>-repository.h"
+#include "<%t.struct.name.toLowerCase()%>-repository-private.h"
+
+#include <QDateTime>
+
+#include <integration/system-info.h>
+#include <utils/common/file-string.h>
+
+#include <messaging/core/api/config.h>
+#include <messaging/core/api/context-impl.h>
+#include <messaging/core/api/listener-impl.h>
+#include <messaging/core/impl/rdds/context-rdds.h>
+#include <messaging/core/impl/rdds/listener-rdds.h>
+
+#define CONTEXT_RDDS_REF static_cast<messaging::core::impl::rdds::ContextRdds&>(messaging::core::api::ContextImpl::instance())
+#define LISTENER_RDDS_REF static_cast<messaging::core::impl::rdds::ListenerRdds&>(messaging::core::api::ListenerImpl::instance())
+
+Q_STATIC_ASSERT_X(sizeof(<%model.name%>::<%t.struct.Name%>) == sizeof(rdds_<%model.name%>::<%t.struct.Name%>), "RDDS compability has corrupted");
+
+namespace <%model.name%> {
+
+<%t.struct.Name%>Repository::~<%t.struct.Name%>Repository()
+{}
+
+bool <%t.struct.Name%>Repository::configure(const QString & configString)
+{
+    static bool configured = false;
+    if (!configured) {
+        instance(configString);
+        return (configured = true);
+    }
+    return false;
+}
+
+void <%t.struct.Name%>Repository::write(const <%t.struct.Name%>Wrapper & data)
+{
+    try
+    {
+        if (instance().d_ptr->dataWriter.is_nil() ) {
+            instance().d_ptr->dataWriter = dds::pub::DataWriter<<%rdds(t.struct.Name)%>>(CONTEXT_RDDS_REF.publisher(), 
+                                                                                         instance().d_ptr->topic, 
+                                                                                         instance().d_ptr->dataWriterQos);
+        }
+
+        data.xtopic().setTimestamp(service::integration::SystemInfo::time().toMSecsSinceEpoch());
+
+        instance().d_ptr->cache(data);
+        const auto *rddsData = reinterpret_cast<const <%rdds(t.struct.Name)%>*>( static_cast<const <%t.struct.Name%>*>(&data) );
+        instance().d_ptr->dataWriter.write(*rddsData);
+
+        emit instance().received(data);
+    }
+    catch (dds::core::Exception &ex)
+    {
+        qCritical() << Q_FUNC_INFO << ex.what();
+    }
+}
+
+void <%t.struct.Name%>Repository::remove(const <%t.struct.Name%>Wrapper & data)
+{
+    try
+    {
+        if (instance().d_ptr->dataWriter.is_nil() ) {
+            instance().d_ptr->dataWriter = dds::pub::DataWriter<<%rdds(t.struct.Name)%>>(CONTEXT_RDDS_REF.publisher(),
+                                                                                         instance().d_ptr->topic,
+                                                                                         instance().d_ptr->dataWriterQos);
+        }
+
+        data.xtopic().setDel(true);
+        data.xtopic().setTimestamp(service::integration::SystemInfo::time().toMSecsSinceEpoch());
+
+        instance().d_ptr->erase(data);
+        const auto *rddsData = reinterpret_cast<const <%rdds(t.struct.Name)%>*>( static_cast<const <%t.struct.Name%>*>(&data) );
+        instance().d_ptr->dataWriter.write(*rddsData);
+
+        emit instance().removed(data);
+    }
+    catch (dds::core::Exception &ex)
+    {
+        qCritical() << Q_FUNC_INFO << ex.what();
+    }
+}
+
+QList<<%t.struct.Name%>Wrapper> <%t.struct.Name%>Repository::select()
+{
+    QMutexLocker locker(&(instance().d_ptr->mutex));
+    Q_UNUSED(locker)
+    return instance().d_ptr->storage.values();
+}
+
+<%t.struct.Name%>Wrapper <%t.struct.Name%>Repository::select(const QByteArray &key, bool *found)
+{
+    QMutexLocker locker(&(instance().d_ptr->mutex));
+    Q_UNUSED(locker)
+
+    auto foundIt = instance().d_ptr->storage.find(key);
+    if (foundIt == instance().d_ptr->storage.end())
+    {
+        if (found) { *found = false; }
+    }
+    else
+    {
+        if (found) { *found = true; }
+        return foundIt.value();
+    }
+
+    return <%t.struct.Name%>Wrapper(reinterpret_cast<void*>(0));
+}
+
+int <%t.struct.Name%>Repository::count()
+{
+    QMutexLocker locker(&(instance().d_ptr->mutex));
+    Q_UNUSED(locker)
+    return instance().d_ptr->storage.size();
+}
+
+<%t.struct.Name%>Repository & <%t.struct.Name%>Repository::instance() 
+{
+    return <%t.struct.Name%>Repository::instance(QString());
+}
+
+<%t.struct.Name%>Repository & <%t.struct.Name%>Repository::instance(const QString & configString) 
+{
+    static <%t.struct.Name%>Repository instance(configString);
+    return instance;
+}
+
+<%t.struct.Name%>Repository::<%t.struct.Name%>Repository(const QString & configString) :
+    d_ptr(new <%t.struct.Name%>RepositoryPrivate)
+{
+    qRegisterMetaType<<%t.struct.Name%>Wrapper>("<%model.name%>::<%t.struct.Name%>Wrapper");
+
+    using namespace service::utils::common;
+    using namespace messaging::core::api;
+
+    QVariantMap config;
+
+    const char * defaultrcPath = MODULES_PATH "/sys-control/data/models/topic.d/default-rc";
+    if (QFile::exists(defaultrcPath))
+    {
+        config.unite(Config(FileString(defaultrcPath)).values());
+    }
+
+    const char * topicrcPath = MODULE_PATH "/data/models/topic.d/<%model.name%>/<%t.struct.name.toLowerCase()%>-rc";
+    if (QFile::exists(topicrcPath))
+    {
+        config.unite(Config(FileString(topicrcPath)).values());
+    }
+
+    config.unite(Config(configString).values());
+    d_ptr->setup(config);
+
+    connect(this, &<%t.struct.Name%>Repository::received, d_ptr.data(), &<%t.struct.Name%>RepositoryPrivate::cache);
+    connect(this, &<%t.struct.Name%>Repository::removed, d_ptr.data(), &<%t.struct.Name%>RepositoryPrivate::erase);
+}
+
+<%t.struct.Name%>RepositoryPrivate::~<%t.struct.Name%>RepositoryPrivate()
+{}
+
+<%t.struct.Name%>RepositoryPrivate::<%t.struct.Name%>RepositoryPrivate() :
+    topic(dds::core::null_type()),
+    dataReader(dds::core::null_type()),
+    dataWriter(dds::core::null_type()),
+    dataReaderQos(dds::sub::qos::DataReaderQos()),
+    dataWriterQos(dds::pub::qos::DataWriterQos())
+{}
+
+void <%t.struct.Name%>RepositoryPrivate::cache(const <%t.struct.Name%>Wrapper & data)
+{
+    QMutexLocker locker(&mutex);
+    Q_UNUSED(locker)
+    storage.insert(data.packedKey(), data);
+}
+
+void <%t.struct.Name%>RepositoryPrivate::erase(const <%t.struct.Name%>Wrapper & data)
+{
+    QMutexLocker locker(&mutex);
+    Q_UNUSED(locker)
+    storage.remove(data.packedKey());
+}
+
+void <%t.struct.Name%>RepositoryPrivate::setup(const QVariantMap &config)
+{
+    try
+    {
+        using namespace dds::core::policy;
+        using namespace service::integration;
+
+        QString topicName("<%t.struct.Name%>");
+
+        if (config.find( QString("local") ) != config.end())
+        {
+            topicName.append(QString("::%1").arg(SystemInfo::mac()));
+        }
+        else if (config.find( QString("slocal") ) != config.end())
+        {
+            topicName.append(QString("::%1::%2").arg(SystemInfo::mac())
+                                                .arg(SystemInfo::screen()));
+        }
+
+        dds::topic::qos::TopicQos topicQos;
+
+        auto foundIt = config.find( QString("reliability") );
+        if (foundIt != config.end() && foundIt->toString() == QString("reliable"))
+        {
+            topicQos << Reliability::Reliable();
+        }
+        else if (foundIt != config.end() && foundIt->toString() == QString("besteffort"))
+        {
+            topicQos << Reliability::BestEffort();
+        }
+
+
+        foundIt = config.find( QString("durability") );
+        if (foundIt != config.end() && foundIt->toString() == QString("volatile"))
+        {
+            topicQos << Durability::Volatile();
+        }
+        else if (foundIt != config.end() && foundIt->toString() == QString("transient"))
+        {
+            topicQos << Durability::Transient();
+        }
+        else if (foundIt != config.end() && foundIt->toString() == QString("transientlocal"))
+        {
+            topicQos << Durability::TransientLocal();
+        }
+        else if (foundIt != config.end() && foundIt->toString() == QString("persistent"))
+        {
+            topicQos << Durability::Persistent();
+        }
+
+
+        foundIt = config.find( QString("history") );
+        if (foundIt != config.end())
+        {
+            topicQos << History::KeepLast(foundIt->toUInt());
+        }
+
+
+        foundIt = config.find( QString("resource") );
+        if (foundIt != config.end())
+        {
+            topicQos << ResourceLimits(foundIt->toInt());
+        }
+
+
+        foundIt = config.find( QString("ownership") );
+        if (foundIt != config.end() && foundIt->toString() == QString("exclusive"))
+        {
+            topicQos << Ownership::Exclusive();
+        }
+        else if (foundIt != config.end() && foundIt->toString() == QString("shared"))
+        {
+            topicQos << Ownership::Shared();
+        }
+
+        topicQos << Liveliness::Automatic();
+
+        topic = dds::topic::Topic<<%rdds(t.struct.Name)%>>(CONTEXT_RDDS_REF.participant(),
+                                             topicName.toStdString().c_str(),
+                                             topicQos);
+
+        dataReaderQos = topicQos;
+        dataWriterQos = topicQos;
+
+
+        foundIt = config.find( QString("autodispose") );
+        if (foundIt != config.end() && foundIt->toBool())
+        {
+            dataWriterQos << WriterDataLifecycle::AutoDisposeUnregisteredInstances();
+        }
+        else if (foundIt != config.end() && foundIt->toBool())
+        {
+            dataWriterQos << WriterDataLifecycle::ManuallyDisposeUnregisteredInstances();
+        }
+
+        dataReader = dds::sub::DataReader<<%rdds(t.struct.Name)%>>(CONTEXT_RDDS_REF.subscriber(), 
+                                                                   topic, 
+                                                                   dataReaderQos);
+        dds::sub::cond::ReadCondition cond(dataReader, 
+                                           dds::sub::status::DataState::any_data(), 
+                                           &<%t.struct.Name%>RepositoryPrivate::onDataAvailable);
+
+        LISTENER_RDDS_REF.addCondition(cond);
+    }
+    catch (std::exception &ex)
+    {
+        qCritical() << Q_FUNC_INFO << ex.what();
+    }
+}
+
+void <%t.struct.Name%>RepositoryPrivate::onDataAvailable(dds::sub::DataReader<<%rdds(t.struct.Name)%>> &dataReader)
+{
+    try
+    {
+        const auto &samples = dataReader.take();
+        for (const auto &sample : samples)
+        {
+            if (!sample.info().valid()) {
+                continue;
+            }
+
+            <%t.struct.Name%>Wrapper wrapper(reinterpret_cast<void*>(0));
+            static_cast<<%t.struct.Name%>&>(wrapper) = reinterpret_cast<const <%t.struct.Name%>&>(sample.data());
+
+            if (wrapper.xtopic().del()) {
+                emit <%t.struct.Name%>Repository::instance().removed(wrapper);
+            } else {
+                emit <%t.struct.Name%>Repository::instance().received(wrapper);
+            }
+        }
+    }
+    catch (dds::core::Exception &ex)
+    {
+        qCritical() << Q_FUNC_INFO << ex.what();
+    }
+}
+
+}

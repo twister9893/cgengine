@@ -1,0 +1,103 @@
+<% 
+    var __fileName__ = s.name.toLowerCase()+'-struct.h';
+    headComment;
+%>
+#ifndef <%s.NAME%>_STRUCT_H
+#define <%s.NAME%>_STRUCT_H
+
+#include <QDataStream>
+<%s.includeList()%>
+namespace <%model.name%> {
+
+class <%s.Name%> {
+public:
+    <%s.Name%>();
+    <%s.Name%>(const <%s.Name%> & other);
+    <%s.Name%>(<%s.Name%> && other);
+
+public:<%
+    var str = '';
+    s.members.forEach( function(m) 
+    {
+        var substr = '';
+        substr += 
+'\n';
+
+        if (m.name !== 'xtopic' && m.name !== 'xstruct') 
+        {
+            substr +=
+'    void set${Member}(${memberInputType} ${member});\n';
+        }
+
+        substr +=
+'    ${memberReturnType} ${member}() const;\n';
+
+        if (m.type.reference) 
+        {
+            substr +=
+'    ${memberType} & ${member}();\n';
+        }
+
+        if (m.name !== 'xtopic' && m.name !== 'xstruct' &&
+            s.name !== 'xTopic' && s.name !== 'xStruct') 
+        {
+            substr +=
+'    bool has${Member}() const;\n';
+        }
+
+        substr = substr.replace(/\${Struct}/g, m.struct.Name)
+                       .replace(/\${Member}/g, m.Name)
+                       .replace(/\${member}/g, m.name)
+                       .replace(/\${memberType}/g, m.type.name)
+                       .replace(/\${memberInputType}/g, m.type.wrapper !== undefined ? m.type.wrapper.name
+                                                                                     : ( m.type.primitive ? m.type.name
+                                                                                                          : 'const '+m.type.name+' &'))
+                       .replace(/\${memberReturnType}/g, m.type.wrapper !== undefined ? m.type.wrapper.name
+                                                                                      : m.type.name);
+        str += substr;
+    } );
+    str;
+%>
+public:
+    QString toString() const;
+    operator QString() const;
+
+public:
+    QByteArray serialize() const;
+    void deserialize(const QByteArray &data);
+
+    friend QDataStream & operator<<(QDataStream &stream, const <%s.Name%> &data);
+    friend QDataStream & operator>>(QDataStream &stream, <%s.Name%> &data);
+
+public:
+    <%s.Name%> & operator=(const <%s.Name%> & other);
+    <%s.Name%> & operator=(<%s.Name%> && other);
+
+private:<%
+    var str = '';
+    s.members.forEach( function(m) 
+    {
+        var substr =
+'\n'+
+'    ${memberType} m_${member}';
+
+        if (m.type.defaultValue !== undefined)
+        {
+            substr +=
+' = ' + m.type.defaultValue;
+        }
+
+        substr += 
+';';
+
+        substr = substr.replace(/\${memberType}/g, m.type.name)
+                       .replace(/\${member}/g, m.name);
+        str += substr;
+    } );
+    str;
+%>
+};
+
+}
+
+#endif // <%s.NAME%>_STRUCT_H

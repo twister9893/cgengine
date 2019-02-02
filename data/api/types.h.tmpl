@@ -1,0 +1,112 @@
+<% 
+    var __fileName__ = model.name+'-types.h';
+    headComment;
+%>
+#ifndef <%model.NAME%>_TYPES_H
+#define <%model.NAME%>_TYPES_H
+
+#include <QDataStream>
+<%
+    var str = '';
+
+    if (model.maps.length > 0)      { str += '#include <map>\n' }
+    if (model.sequences.length > 0) { str += '#include <vector>\n' }
+
+    model.maps.forEach( function(m) 
+    {
+        var istr = m.keyType.includeString();
+        if (!istr.contains(__fileName__) && !str.contains(istr)) {
+            str += istr + '\n';
+        }
+        istr = m.valueType.includeString();
+        if (!istr.contains(__fileName__) && !str.contains(istr)) {
+            str += istr + '\n';
+        }
+    } );
+
+    model.sequences.forEach( function(s) 
+    {
+        var istr = s.type.includeString();
+        if (!istr.contains(__fileName__) && !str.contains(istr)) {
+            str += istr + '\n';
+        }
+    } );
+
+    str;
+%>
+namespace <%model.name%> {
+
+<%
+    var str = '';
+    model.enums.forEach( function(enm) 
+    {
+        var substr = '';
+        substr +=
+'enum class ${Name} : ${type} {\n';
+
+        enm.enumerators.forEach( function(e) 
+        {
+            var elemstr = 
+'    ${Name} = ${value},\n';
+
+            elemstr = elemstr.replace(/\${Name}/g, e.Name)
+                             .replace(/\${value}/g, e.value);
+            substr += elemstr;
+        } );
+
+        substr +=
+'};\n\n'
+
+        substr = substr.replace(/\${Name}/g, enm.Name)
+                       .replace(/\${type}/g, enm.type.name);
+        str += substr;
+    } );
+
+
+    model.maps.forEach( function(map) 
+    {
+        var substr = 
+'typedef std::map<${keyType},${valueType}> ${Name};\n';
+
+        substr = substr.replace(/\${keyType}/g, map.keyType.name)
+                       .replace(/\${valueType}/g, map.valueType.name)
+                       .replace(/\${Name}/g, map.Name);
+        str += substr;
+    } );
+
+
+    model.sequences.forEach( function(seq) 
+    {
+        var substr = 
+'typedef std::vector<${type}> ${Name};\n';
+
+        substr = substr.replace(/\${type}/g, seq.type.name)
+                       .replace(/\${Name}/g, seq.Name);
+        str += substr;
+    } );
+
+
+    model.enums.forEach( function(enm) 
+    {
+        var substr =
+'\n'+
+'inline QDataStream & operator<<(QDataStream &stream, ${Name} data)\n'+
+'{\n'+
+'    return (stream << ${type}(data));\n'+
+'}\n'+
+'\n'+
+'inline QDataStream & operator>>(QDataStream &stream, ${Name} &data)\n'+
+'{\n'+
+'    return (stream >> reinterpret_cast<${type}&>(data));\n'+
+'}\n';
+
+        substr = substr.replace(/\${Name}/g, enm.Name)
+                       .replace(/\${type}/g, enm.type.name);
+        str += substr;
+    } );
+
+    str;
+%>
+}
+
+#endif // <%model.NAME%>_TYPES_H

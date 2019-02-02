@@ -1,0 +1,47 @@
+<% 
+    var __fileName__ = t.struct.name.toLowerCase()+'-base.h';
+    headComment;
+%>
+#ifdef WRAPPER
+#undef WRAPPER
+#endif
+
+#define WRAPPER \
+    friend class <%t.struct.Name%>Repository;\
+    friend class <%t.struct.Name%>RepositoryPrivate;\
+    <%t.struct.Name%>Wrapper(void* nothing) : <%t.struct.Name%>Base(nothing) {}
+
+
+#ifndef <%t.struct.NAME%>_BASE_H
+#define <%t.struct.NAME%>_BASE_H
+
+#include "<%t.struct.name.toLowerCase()%>-struct.h"
+
+namespace <%model.name%> {
+
+class <%t.struct.Name%>Base : public <%t.struct.Name%> {
+public:
+    virtual ~<%t.struct.Name%>Base();
+
+public:
+    void setPackedKey(const QByteArray &key);
+    QByteArray packedKey() const;
+
+    virtual void sync();
+    virtual void del();
+    virtual bool load();
+
+protected:
+    <%t.struct.Name%>Base();
+    <%t.struct.Name%>Base(void*);
+    <%t.struct.Name%>Base(const <%t.struct.Name%>Base & other);
+    <%t.struct.Name%>Base(<%t.struct.Name%>Base && other);
+
+protected:
+    <%t.struct.Name%>Base & operator=(const <%t.struct.Name%>Base & other);
+    <%t.struct.Name%>Base & operator=(<%t.struct.Name%>Base && other);
+};
+
+}
+
+#endif // <%t.struct.NAME%>_BASE_H

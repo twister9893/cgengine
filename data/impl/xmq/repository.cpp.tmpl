@@ -1,0 +1,147 @@
+<% 
+    var __fileName__ = t.struct.name.toLowerCase()+'-repository.cpp';
+    headComment;
+%>
+#include "<%t.struct.name.toLowerCase()%>-repository.h"
+#include "<%t.struct.name.toLowerCase()%>-repository-private.h"
+
+#include <integration/system-info.h>
+#include <utils/common/file-string.h>
+
+#include <messaging/core/core.h>
+#include <messaging/core/api/config.h>
+
+using namespace <%model.name%>;
+
+<%t.struct.Name%>Repository::~<%t.struct.Name%>Repository()
+{}
+
+bool <%t.struct.Name%>Repository::configure(const QString & configString)
+{
+    static bool configured = false;
+    if (!configured) {
+        instance(configString);
+        return (configured = true);
+    }
+    return false;
+}
+
+void <%t.struct.Name%>Repository::write(const <%t.struct.Name%>Wrapper & data)
+{
+    instance().d_ptr->cache(data);
+    messaging::core::sender().send("<%t.struct.name.toLowerCase()%>", data.packedKey(), data.serialize());
+
+    emit instance().received(data);
+}
+
+void <%t.struct.Name%>Repository::remove(const <%t.struct.Name%>Wrapper & data)
+{
+    data.xtopic().setDel(true);
+    instance().d_ptr->erase(data);
+    messaging::core::sender().send("<%t.struct.name.toLowerCase()%>", data.packedKey(), data.serialize());
+
+    emit instance().removed(data);
+}
+
+QList<<%t.struct.Name%>Wrapper> <%t.struct.Name%>Repository::select()
+{
+    QMutexLocker locker(&(instance().d_ptr->mutex));
+    Q_UNUSED(locker)
+    return instance().d_ptr->storage.values();
+}
+
+<%t.struct.Name%>Wrapper <%t.struct.Name%>Repository::select(const QByteArray &key, bool *found)
+{
+    QMutexLocker locker(&(instance().d_ptr->mutex));
+    Q_UNUSED(locker)
+
+    auto foundIt = instance().d_ptr->storage.find(key);
+    if (foundIt == instance().d_ptr->storage.end())
+    {
+        if (found) { *found = false; }
+    }
+    else
+    {
+        if (found) { *found = true; }
+        return foundIt.value();
+    }
+
+    return <%t.struct.Name%>Wrapper(reinterpret_cast<void*>(0));
+}
+
+int <%t.struct.Name%>Repository::count()
+{
+    QMutexLocker locker(&(instance().d_ptr->mutex));
+    Q_UNUSED(locker)
+    return instance().d_ptr->storage.size();
+}
+
+<%t.struct.Name%>Repository & <%t.struct.Name%>Repository::instance() {
+    return <%t.struct.Name%>Repository::instance(QString());
+}
+
+<%t.struct.Name%>Repository & <%t.struct.Name%>Repository::instance(const QString & configString) {
+    static <%t.struct.Name%>Repository instance(configString);
+    return instance;
+}
+
+<%t.struct.Name%>Repository::<%t.struct.Name%>Repository(const QString & configString) :
+    d_ptr(new <%t.struct.Name%>RepositoryPrivate)
+{
+    qRegisterMetaType<<%t.struct.Name%>Wrapper>("<%model.name%>::<%t.struct.Name%>Wrapper");
+
+    using namespace service::utils::common;
+    QVariantMap config;
+
+    const char * defaultrcPath = MODULES_PATH "/sys-control/data/models/topic.d/default-rc";
+    if (QFile::exists(defaultrcPath))
+    {
+        config.unite(messaging::core::api::Config(FileString(defaultrcPath)).values());
+    }
+
+    const char * topicrcPath = MODULE_PATH "/data/models/topic.d/<%model.name%>/<%t.struct.name.toLowerCase()%>-rc";
+    if (QFile::exists(topicrcPath))
+    {
+        config.unite(messaging::core::api::Config(FileString(topicrcPath)).values());
+    }
+
+    config.unite(messaging::core::api::Config(configString).values());
+    d_ptr->setup(config);
+
+    connect(this, &<%t.struct.Name%>Repository::received, d_ptr.data(), &<%t.struct.Name%>RepositoryPrivate::cache);
+    connect(this, &<%t.struct.Name%>Repository::removed, d_ptr.data(), &<%t.struct.Name%>RepositoryPrivate::erase);
+}
+
+<%t.struct.Name%>RepositoryPrivate::<%t.struct.Name%>RepositoryPrivate()
+{}
+
+void <%t.struct.Name%>RepositoryPrivate::cache(const <%t.struct.Name%>Wrapper & data)
+{
+    QMutexLocker locker(&mutex);
+    Q_UNUSED(locker)
+    storage.insert(data.packedKey(), data);
+}
+
+void <%t.struct.Name%>RepositoryPrivate::erase(const <%t.struct.Name%>Wrapper & data)
+{
+    QMutexLocker locker(&mutex);
+    Q_UNUSED(locker)
+    storage.remove(data.packedKey());
+}
+
+void <%t.struct.Name%>RepositoryPrivate::setup(const QVariantMap &config)
+{
+    messaging::core::listener().subscribe("<%t.struct.name.toLowerCase()%>", onDataAvailable);
+}
+
+void <%t.struct.Name%>RepositoryPrivate::onDataAvailable(const QByteArray &data)
+{
+    <%t.struct.Name%>Wrapper wrapper(reinterpret_cast<void*>(0));
+    wrapper.deserialize(data);
+
+    if (wrapper.xtopic().del()) {
+        emit <%t.struct.Name%>Repository::instance().removed(wrapper);
+    } else {
+        emit <%t.struct.Name%>Repository::instance().received(wrapper);
+    }
+}

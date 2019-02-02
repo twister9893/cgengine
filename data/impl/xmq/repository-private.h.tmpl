@@ -1,0 +1,39 @@
+<% 
+    var __fileName__ = t.struct.name.toLowerCase()+'-repository-private.h';
+    headComment;
+%>
+
+#ifndef <%t.struct.NAME%>_REPOSITORY_PRIVATE_H
+#define <%t.struct.NAME%>_REPOSITORY_PRIVATE_H
+
+#include <QObject>
+#include <QMutex>
+#include <QMap>
+
+#include <<%model.name%>/<%t.struct.name.toLowerCase()%>-wrapper.h>
+
+namespace <%model.name%> {
+
+class <%t.struct.Name%>RepositoryPrivate : public QObject {
+    Q_OBJECT
+public:
+    QMutex mutex;
+    QMap<QByteArray, <%t.struct.Name%>Wrapper> storage;
+
+public:
+    <%t.struct.Name%>RepositoryPrivate();
+
+public slots:
+    void cache(const <%t.struct.Name%>Wrapper &data);
+    void erase(const <%t.struct.Name%>Wrapper &data);
+
+public:
+    void setup(const QVariantMap &config);
+
+private:
+    static void onDataAvailable(const QByteArray &data);
+};
+
+}
+
+#endif // <%t.struct.NAME%>_REPOSITORY_PRIVATE_H

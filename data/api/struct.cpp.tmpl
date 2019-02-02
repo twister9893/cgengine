@@ -1,0 +1,203 @@
+<% 
+    var __fileName__ = s.name.toLowerCase()+'-struct.cpp';
+    headComment;
+%>
+#include "<%s.name.toLowerCase()%>-struct-private.h"
+#include "<%model.name%>-types.h"
+
+#include <messaging/core/api/stream.h>
+
+namespace <%model.name%> {
+
+<%s.Name%>::<%s.Name%>()
+{}
+
+<%s.Name%>::<%s.Name%>(const <%s.Name%> & other)
+{
+    *this = other;
+}
+
+<%s.Name%>::<%s.Name%>(<%s.Name%> && other)
+{
+    *this = other;
+}
+
+<%
+    var str = '';
+    s.members.forEach( function(m) 
+    {
+        var substr = '';
+        if (m.name !== 'xtopic' && m.name !== 'xstruct') 
+        {
+            substr +=
+'void ${Struct}::set${Member}(${memberInputType} ${member})\n'+
+'{\n'+
+'    m_${member} = ${setterExpression};\n';
+
+            if (s.name !== 'xTopic' && s.name !== 'xStruct') 
+            {
+                substr +=
+'    m_xstruct.setBitmask( m_xstruct.bitmask() | static_cast<quint64>(x${Struct}Bit::${Member}) );\n';
+            }
+            
+            substr +=
+'}\n\n';
+        }
+
+        substr +=
+'${memberReturnType} ${Struct}::${member}() const\n'+
+'{\n'+
+'    return ${returnExpression};\n'+
+'}\n\n';
+
+        if (m.type.reference) 
+        {
+            substr +=
+'${memberType} & ${Struct}::${member}()\n'+
+'{\n'
+
+            if (m.name !== 'xtopic' && m.name !== 'xstruct' &&
+                s.name !== 'xTopic' && s.name !== 'xStruct') 
+            {
+                substr +=
+'    m_xstruct.setBitmask( m_xstruct.bitmask() | static_cast<quint64>(x${Struct}Bit::${Member}) );\n';
+            }
+
+            substr +=
+'    return m_${member};\n'+
+'}\n\n';
+        }
+
+        if (m.name !== 'xtopic' && m.name !== 'xstruct' &&
+            s.name !== 'xTopic' && s.name !== 'xStruct') 
+        {
+            substr +=
+'bool ${Struct}::has${Member}() const'+
+'{\n'+
+'    return ( m_xstruct.bitmask() & static_cast<quint64>(x${Struct}Bit::${Member}) );\n'+
+'}\n\n';
+        }
+
+        var memberExpr = 'm_'+m.name;
+        substr = substr.replace(/\${Struct}/g, m.struct.Name)
+                       .replace(/\${Member}/g, m.Name)
+                       .replace(/\${member}/g, m.name)
+                       .replace(/\${memberType}/g, m.type.name)
+                       .replace(/\${memberInputType}/g, m.type.wrapper !== undefined ? m.type.wrapper.name
+                                                                                     : ( m.type.primitive ? m.type.name
+                                                                                                          : 'const '+m.type.name+' &'))
+                       .replace(/\${memberReturnType}/g, m.type.wrapper !== undefined ? m.type.wrapper.name
+                                                                                      : m.type.name)
+                       .replace(/\${setterExpression}/g, m.type.wrapper !== undefined ? m.type.wrapper.unwrapped(m.name)
+                                                                                      : m.name)
+                       .replace(/\${returnExpression}/g, m.type.wrapper !== undefined ? m.type.wrapper.wrapped(memberExpr)
+                                                                                      : memberExpr);
+        str += substr;
+    } );
+
+    str;
+%>
+QString <%s.Name%>::toString() const
+{
+    QString string = "[<%model.name%>::<%s.Name%>]\n";
+<%
+    var str = '';
+    s.members.forEach( function(m) 
+    {
+        var substr = 
+'    string.append( \"  ${member}\\t: n/d\\n\" );\n';
+
+        substr = substr.replace(/\${member}/g, m.name);
+        str += substr;
+    } );
+    str;
+%>
+    return string;
+}
+
+<%s.Name%>::operator QString() const
+{
+    return toString();
+}
+
+QByteArray <%s.Name%>::serialize() const
+{
+    QByteArray data;
+    QDataStream stream(&data, QIODevice::WriteOnly);
+    stream << *this;
+    return data;
+}
+
+void <%s.Name%>::deserialize(const QByteArray &data)
+{
+    QDataStream stream(data);
+    stream >> *this;
+}
+
+QDataStream & operator<<(QDataStream &stream, const <%s.Name%> &data)
+{
+    using ::messaging::core::api::operator<<;
+
+<%
+    var str = '';
+    s.members.forEach( function(m) 
+    {
+        str +=
+'    stream << data.m_'+m.name+';\n';
+    } );
+    str;
+%>
+    return stream;
+}
+
+QDataStream & operator>>(QDataStream &stream, <%s.Name%> &data)
+{
+    using ::messaging::core::api::operator>>;
+
+<%
+    var str = '';
+    s.members.forEach( function(m) 
+    {
+        str +=
+'    stream >> data.m_'+m.name+';\n';
+    } );
+    str;
+%>
+    return stream;
+}
+
+<%s.Name%> & <%s.Name%>::operator=(const <%s.Name%> & other)
+{
+<%
+    var str = '';
+    s.members.forEach( function(m) 
+    {
+        var substr =
+'    m_${member} = other.m_${member};\n';
+
+        substr = substr.replace(/\${member}/g, m.name);
+        str += substr;
+    } );
+    str;
+%>
+    return *this;
+}
+
+<%s.Name%> & <%s.Name%>::operator=(<%s.Name%> && other)
+{
+<%
+    var str = '';
+    s.members.forEach( function(m) 
+    {
+        var substr =
+'    m_${member} = std::move(other.m_${member});\n';
+
+        substr = substr.replace(/\${member}/g, m.name);
+        str += substr;
+    } );
+    str;
+%>
+    return *this;
+}
+
+}

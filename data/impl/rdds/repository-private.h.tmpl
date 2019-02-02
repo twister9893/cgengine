@@ -1,0 +1,54 @@
+<% 
+    var __fileName__ = t.struct.name.toLowerCase()+'-repository-private.h';
+
+    function rdds(type) {
+        return 'rdds_'+model.name+'::'+type;
+    }
+    headComment;
+%>
+#ifndef <%t.struct.NAME%>_REPOSITORY_PRIVATE_H
+#define <%t.struct.NAME%>_REPOSITORY_PRIVATE_H
+
+#include <QObject>
+#include <QMutex>
+#include <QMap>
+
+#include <<%model.name%>/<%t.struct.name.toLowerCase()%>-wrapper.h>
+#include "rdds_<%model.name%>_DCPS.hpp"
+
+namespace <%model.name%> {
+
+class <%t.struct.Name%>RepositoryPrivate : public QObject {
+    Q_OBJECT
+public:
+    dds::topic::Topic<<%rdds(t.struct.Name)%>> topic;
+    dds::sub::DataReader<<%rdds(t.struct.Name)%>> dataReader;
+    dds::pub::DataWriter<<%rdds(t.struct.Name)%>> dataWriter;
+    dds::sub::qos::DataReaderQos dataReaderQos;
+    dds::pub::qos::DataWriterQos dataWriterQos;
+
+    QMutex mutex;
+    QMap<QByteArray, <%t.struct.Name%>Wrapper> storage;
+
+public:
+    virtual ~<%t.struct.Name%>RepositoryPrivate();
+    <%t.struct.Name%>RepositoryPrivate();
+
+public slots:
+    void cache(const <%t.struct.Name%>Wrapper &data);
+    void erase(const <%t.struct.Name%>Wrapper &data);
+
+public:
+    void setup(const QVariantMap &config);
+
+public:
+    <%t.struct.Name%>RepositoryPrivate & operator=(const <%t.struct.Name%>RepositoryPrivate &) { return *this; }
+    <%t.struct.Name%>RepositoryPrivate & operator=(<%t.struct.Name%>RepositoryPrivate &&) { return *this; }
+
+public:
+    static void onDataAvailable(dds::sub::DataReader<<%rdds(t.struct.Name)%>> &dataReader);
+};
+
+}
+
+#endif // <%t.struct.NAME%>_REPOSITORY_PRIVATE_H

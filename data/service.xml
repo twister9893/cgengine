@@ -4,7 +4,7 @@
   <name>Служебная модель</name>
   <purpose>Модель для системного управления</purpose>
   <version>0.0.1</version>
-  <modificationDate>11/5/18</modificationDate>
+  <modificationDate>11/22/18</modificationDate>
   <description></description>
  </modelIdentification>
  <namespace>service</namespace>
@@ -124,29 +124,6 @@
    </enumerator>
    <definition>Режим работы АРМ</definition>
   </enumeration>
-  <map>
-   <name>dd</name>
-   <typeMapKey>Int16</typeMapKey>
-   <typeElement>Byte</typeElement>
-   <shared>false</shared>
-   <elementMaxLength>-1</elementMaxLength>
-   <definition></definition>
-  </map>
-  <sequence>
-   <name>ff</name>
-   <seqType>Byte</seqType>
-   <shared>false</shared>
-   <memberMaxLength>-1</memberMaxLength>
-   <definition></definition>
-  </sequence>
-  <array>
-   <name>gg</name>
-   <type>Boolean</type>
-   <shared>false</shared>
-   <bounds>2 3 4</bounds>
-   <key>false</key>
-   <definition></definition>
-  </array>
   <string>
    <name>String8</name>
    <type>Char8</type>
@@ -249,7 +226,7 @@
   <structure>
    <name>Palette</name>
    <memberAgregate>
-    <name>name</name>
+    <name>type</name>
     <type>PaletteType</type>
     <key>false</key>
     <shared>false</shared>
@@ -349,12 +326,12 @@
   <structure>
    <name>WorkstationMode</name>
    <memberAgregate>
-    <name>id</name>
-    <type>UInt32</type>
+    <name>hostName</name>
+    <type>String8</type>
     <key>true</key>
     <shared>false</shared>
     <optional>false</optional>
-    <definition>Идентификатор АРМ</definition>
+    <definition>Имя хоста АРМ</definition>
    </memberAgregate>
    <memberAgregate>
     <name>mode</name>
@@ -374,6 +351,14 @@
   <structure>
    <name>WorkstationReconf</name>
    <memberAgregate>
+    <name>hostName</name>
+    <type>String8</type>
+    <key>false</key>
+    <shared>false</shared>
+    <optional>false</optional>
+    <definition>Имя хоста АРМ</definition>
+   </memberAgregate>
+   <memberAgregate>
     <name>id</name>
     <type>UInt32</type>
     <key>false</key>
@@ -387,39 +372,6 @@
     <text></text>
    </verbatim>
    <definition>Сигнал об изменении конфигурации АРМ</definition>
-  </structure>
-  <structure>
-   <name>MyStruct</name>
-   <memberAgregate>
-    <name>field</name>
-    <type>UInt16</type>
-    <key>false</key>
-    <shared>false</shared>
-    <optional>false</optional>
-    <definition></definition>
-   </memberAgregate>
-   <memberAgregate>
-    <name>enumField</name>
-    <type>ProcessCommand</type>
-    <key>false</key>
-    <shared>false</shared>
-    <optional>false</optional>
-    <definition></definition>
-   </memberAgregate>
-   <memberAgregate>
-    <name>vec</name>
-    <type>Boolean</type>
-    <key>false</key>
-    <shared>false</shared>
-    <optional>false</optional>
-    <definition></definition>
-   </memberAgregate>
-   <verbatim>
-    <language>c++</language>
-    <placement>before-declaration</placement>
-    <text></text>
-   </verbatim>
-   <definition></definition>
   </structure>
  </constructedtypes>
  <topicDataType>
@@ -467,9 +419,9 @@
  <topicDataType>
   <structName>WorkstationMode</structName>
   <keys>
-   <key>id</key>
+   <key>hostName</key>
   </keys>
-  <definition>${reliable}</definition>
+  <definition></definition>
  </topicDataType>
  <topicDataType>
   <structName>WorkstationReconf</structName>
